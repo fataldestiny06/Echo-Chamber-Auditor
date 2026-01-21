@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use("Agg")
+
 import streamlit as st
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -5,6 +8,7 @@ import pandas as pd
 import os
 import sys
 from pathlib import Path
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(ROOT_DIR))
