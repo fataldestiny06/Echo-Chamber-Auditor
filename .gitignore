@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Data & outputs
+main/data/
+main/output/
+output/
+*.csv
+*.png
+*.gexf
+
+# OS
+.DS_Store

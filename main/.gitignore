@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.env/
+.venv/
+conda-env/
+
+# OS
+.DS_Store
+
+# Selenium / browser junk
+*.log
