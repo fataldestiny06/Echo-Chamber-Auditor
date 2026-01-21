@@ -4,7 +4,6 @@ from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
@@ -58,10 +57,10 @@ def compute_cluster_tightness(embeddings, labels):
 
 
 # ===============================
-# MAIN
+# CORE ANALYSIS FUNCTION
 # ===============================
 
-def main():
+def run_analysis():
     print("🔍 Starting Echo Chamber Analysis\n")
 
     df = load_data()
@@ -69,12 +68,9 @@ def main():
     if "title" not in df.columns:
         raise ValueError("CSV must contain 'title' column")
 
-    # ---- HANDLE DESCRIPTION COLUMN ----
     if "description" not in df.columns:
-        print("⚠️ No 'description' column found — using titles only")
         df["description"] = ""
 
-    # ---- FORCE STRINGS ----
     df["title"] = df["title"].fillna("").astype(str)
     df["description"] = df["description"].fillna("").astype(str)
 
@@ -82,9 +78,7 @@ def main():
     texts = df["combined_text"].tolist()
 
     print(f"📄 Total documents: {len(texts)}")
-    print(f"📝 Using descriptions: {(df['description'] != '').sum()} / {len(df)} videos")
 
-    # ---- EMBEDDINGS ----
     model = SentenceTransformer(MODEL_NAME)
     embeddings = model.encode(
         texts,
@@ -93,21 +87,14 @@ def main():
         normalize_embeddings=True
     )
 
-    # ===============================
-    # 🔥 NEW: STORE EMBEDDINGS IN CSV
-    # ===============================
-    emb_dim = embeddings.shape[1]
-    emb_cols = [f"emb_{i}" for i in range(emb_dim)]
+    # ---- STORE EMBEDDINGS ----
+    emb_cols = [f"emb_{i}" for i in range(embeddings.shape[1])]
     emb_df = pd.DataFrame(embeddings, columns=emb_cols)
-
     df = pd.concat([df.reset_index(drop=True), emb_df], axis=1)
 
     # ---- CLUSTERING ----
     k = determine_k(len(df))
-    print(f"📊 Using k = {k}")
-
     if k == 1:
-        print("⚠️ Too few samples — skipping clustering")
         df["cluster"] = 0
     else:
         kmeans = KMeans(n_clusters=k, random_state=RANDOM_STATE)
@@ -118,18 +105,13 @@ def main():
         embeddings, df["cluster"].values
     )
     df["cluster_tightness"] = df["cluster"].map(tightness)
-    df["potentially_radical"] = (
-        df["cluster_tightness"] >= RADICAL_TIGHTNESS_THRESHOLD
-    )
+    df["potentially_radical"] = df["cluster_tightness"] >= RADICAL_TIGHTNESS_THRESHOLD
 
-    # ---- SAVE DATASET (WITH EMBEDDINGS) ----
+    # ---- SAVE DATASET ----
     out_csv = OUTPUT_DIR / "sbert_dataset.csv"
     df.to_csv(out_csv, index=False)
-    print(f"💾 Saved SBERT dataset with embeddings → {out_csv}")
 
-    # ===============================
-    # 🔥 GEOMETRIC EMBEDDING VISUALIZATION
-    # ===============================
+    # ---- PCA VIS ----
     if len(df) > 1:
         pca = PCA(n_components=2, random_state=RANDOM_STATE)
         reduced = pca.fit_transform(embeddings)
@@ -150,13 +132,29 @@ def main():
         plot_path = OUTPUT_DIR / "clusters_2d.png"
         plt.savefig(plot_path, dpi=300)
         plt.close()
-        print(f"🖼 Saved geometric embedding plot → {plot_path}")
 
-    print("\n✅ Analysis complete")
-    for c, score in tightness.items():
-        if score >= RADICAL_TIGHTNESS_THRESHOLD:
-            print(f"⚠️ Potentially radical cluster {c} (tightness={score:.2f})")
+    # ---- RETURN METRICS FOR APP ----
+    return {
+        "echo_score": max(tightness.values()) if tightness else 0.0,
+        "intra_similarity": np.mean(list(tightness.values())) if tightness else 0.0
+    }
 
+
+# ===============================
+# 🔥 COMPATIBILITY CLASS (FIXES IMPORT ERROR)
+# ===============================
+
+class EchoChamberAnalyzer:
+    def __init__(self):
+        pass
+
+    def run(self):
+        return run_analysis()
+
+
+# ===============================
+# CLI ENTRY POINT
+# ===============================
 
 if __name__ == "__main__":
-    main()
+    run_analysis()
